@@ -8,20 +8,18 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import { useContainer } from 'class-validator';
 import * as morgan from 'morgan';
 import * as chalk from 'chalk';
 import * as basicAuth from 'basic-auth';
 import * as compression from 'compression';
 import helmet from 'helmet';
-import { useContainer } from 'class-validator';
 
 export async function createApp() {
-  // Always use FastifyAdapter
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
   );
-
   const configService = app.get(ConfigService);
 
   // Middleware for logging requests
@@ -62,15 +60,26 @@ export async function createApp() {
   const swaggerPassword = configService.get<string>('SWAGGER_PASSWORD');
 
   if (process.env.NODE_ENV === 'production') {
-    app.use('/api/docs', (req, res, next) => {
-      const user = basicAuth(req);
-      if (!user || user.name !== swaggerUser || user.pass !== swaggerPassword) {
-        res.set('WWW-Authenticate', 'Basic realm="Swagger"');
-        res.status(401).send('Authentication required.');
-        return;
-      }
-      next();
-    });
+    app
+      .getHttpAdapter()
+      .getInstance()
+      .addHook('onRequest', async (req, reply) => {
+        // Check if the request is for the Swagger documentation route
+        if (req.url.startsWith('/api/docs')) {
+          const user = basicAuth(req);
+          if (
+            !user ||
+            user.name !== swaggerUser ||
+            user.pass !== swaggerPassword
+          ) {
+            reply
+              .header('WWW-Authenticate', 'Basic realm="Swagger"')
+              .status(401)
+              .send('Authentication required.');
+            return reply;
+          }
+        }
+      });
   }
 
   const swaggerConfig = new DocumentBuilder()

@@ -4,24 +4,24 @@ frameworkVersion: '4.4.7'
 
 provider:
   name: aws
-  runtime: nodejs16.x
+  runtime: nodejs18.x  
   architecture: arm64
   stage: production
   region: us-east-1
   memorySize: 2048
   logRetentionInDays: 1
-  timeout: 15
+  timeout: 30
   vpc:
     securityGroupIds:
-      - sg-03f48efe5e5f66d1f  
+      - sg-123  
     subnetIds:
-      - subnet-67d2cd3a  
-      - subnet-5c0ce63b  
-      - subnet-bc8320f6  
-      
+      - subnet-123  
+
 functions:
   api:
     handler: dist/lambda.handler
+    timeout: 30         
+    memorySize: 2048    
     events:
       - httpApi:
           method: any
