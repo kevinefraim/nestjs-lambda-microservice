@@ -1,0 +1,52 @@
+service: meetings-microservice
+
+frameworkVersion: '4.4.7'
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  architecture: arm64
+  stage: production
+  region: us-east-1
+  memorySize: 2048
+  logRetentionInDays: 1
+  timeout: 15
+  vpc:
+    securityGroupIds:
+      - sg-03f48efe5e5f66d1f  
+    subnetIds:
+      - subnet-67d2cd3a  
+      - subnet-5c0ce63b  
+      - subnet-bc8320f6  
+      
+functions:
+  api:
+    handler: dist/lambda.handler
+    events:
+      - httpApi:
+          method: any
+          path: /{proxy+}
+
+plugins:
+  - serverless-jetpack
+  - serverless-offline
+  - serverless-dotenv-plugin
+
+custom:
+  dotenv:
+    path: .env.production
+
+package:
+  include:
+    - '!node_modules/.prisma/client/libquery_engine-*'
+    - 'node_modules/.prisma/client/libquery_engine-rhel-openssl-1.0.x*'
+    - '!node_modules/prisma/libquery_engine-*'
+    - '!node_modules/@prisma/engines/**'
+    - '!node_modules/.cache/prisma/**'
+    - 'node_modules/.prisma/**'
+    - 'node_modules/@prisma/**'
+    - 'dist/**'
+    - '!src/**'
+    - '!test/**'
+    - '!**/*.spec.ts'
+    - 'node_modules/.prisma/client/libquery_engine-linux-arm64-*'

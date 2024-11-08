@@ -1,0 +1,33 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "linux-arm64-openssl-1.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model meetings {
+  id              String    @id @default(uuid())
+  twilio_room_sid String?   @db.VarChar(50)
+  creator_id      String
+  title           String    @db.VarChar(191)
+  description     String?
+  start_at        DateTime
+  end_at          DateTime
+  group_urn       String?
+  created_at      DateTime? @default(now())
+  updated_at      DateTime? @updatedAt
+
+  users meeting_user[]
+}
+
+model meeting_user {
+  meeting_id String
+  user_id    String
+
+  meeting meetings @relation(fields: [meeting_id], references: [id])
+
+  @@id([meeting_id, user_id])
+}
