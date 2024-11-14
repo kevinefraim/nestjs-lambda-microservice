@@ -13,9 +13,9 @@ provider:
   timeout: 30
   vpc:
     securityGroupIds:
-      - sg-123  
+      - sg-123 
     subnetIds:
-      - subnet-123  
+      - subnet-123
 
 functions:
   api:
@@ -28,13 +28,36 @@ functions:
           path: /{proxy+}
 
 plugins:
+  - serverless-prune-plugin
   - serverless-jetpack
   - serverless-offline
   - serverless-dotenv-plugin
+  - serverless-plugin-optimize
+
 
 custom:
   dotenv:
     path: .env.production
+  prune:
+    automatic: true
+    include:
+      - node_modules/.prisma/client
+    exclude:
+      - node_modules/**/*.md
+      - node_modules/**/*.map
+      - node_modules/**/test
+      - node_modules/**/tests
+      - node_modules/**/*.d.ts
+      - node_modules/**/*.ts
+      - node_modules/**/*.markdown
+      - node_modules/**/docs
+      - node_modules/**/*.snap
+      - node_modules/**/example
+      - node_modules/**/examples
+      - node_modules/.cache
+      - node_modules/@prisma/engines
+      - node_modules/@types
+
 
 package:
   include:
@@ -46,7 +69,13 @@ package:
     - 'node_modules/.prisma/**'
     - 'node_modules/@prisma/**'
     - 'dist/**'
-    - '!src/**'
-    - '!test/**'
-    - '!**/*.spec.ts'
     - 'node_modules/.prisma/client/libquery_engine-linux-arm64-*'
+  excludeDevDependencies: true
+  individually: true
+  exclude:
+    - .gitignore
+    - package-lock.json
+    - .git/**
+    - .src/**
+    - .vscode/**
+    

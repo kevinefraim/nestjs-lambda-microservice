@@ -19,7 +19,7 @@ export class MeetingService {
   async createMeeting(user: CoreUser, data: CreateMeetingDto) {
     this.helper.validateCreateMeetingData(data);
 
-    data.start_at = data.start_at || new Date();
+    data.start_at = !!data.start_at ? new Date(data.start_at) : new Date();
     data.end_at =
       data.end_at || new Date(data.start_at.getTime() + 60 * 60 * 1000);
 
@@ -44,7 +44,7 @@ export class MeetingService {
   private async createTwilioRoom(data: CreateMeetingDto) {
     return this.twilioService.createRoom({
       title: data.title,
-      maxParticipants: data.max_participants,
+      maxParticipants: data.max_participants ?? 50,
     });
   }
 
@@ -54,12 +54,15 @@ export class MeetingService {
     sid: string,
   ) {
     const { max_participants, ...rest } = data;
+    const start_at = data.start_at || new Date();
     return this.prisma.meetings.create({
       data: {
         ...rest,
         twilio_room_sid: sid,
-        start_at: data.start_at,
-        end_at: data.end_at,
+        start_at,
+        end_at: data.end_at
+          ? data.end_at
+          : new Date(start_at.getTime() + 60 * 60 * 1000),
         creator_id: user.urn,
         users: {
           createMany: {
@@ -82,6 +85,9 @@ export class MeetingService {
     const meeting = await this.prisma.meetings.findFirst({
       where: { id: meetingId, users: { some: { user_id: user.urn } } },
     });
+    if (!meeting || !meeting.twilio_room_sid) {
+      throw new HttpException('Meeting not found', HttpStatus.NOT_FOUND);
+    }
 
     const isCreator = meeting.creator_id === user.urn;
 
@@ -124,6 +130,9 @@ export class MeetingService {
     action: 'start' | 'stop',
   ) {
     const meeting = await this.getMeetingCreator(meetingId, user.urn);
+    if (!meeting || !meeting.twilio_room_sid) {
+      throw new HttpException('Meeting not found', HttpStatus.NOT_FOUND);
+    }
     const rules =
       action === 'start'
         ? [{ type: 'include', all: true }]
@@ -148,59 +157,56 @@ export class MeetingService {
     const meeting = await this.prisma.meetings.findUnique({
       where: { id: meetingId, creator_id: creatorId },
     });
-    if (meeting.creator_id !== creatorId) {
-      throw new HttpException(
-        'Permission denied: not the meeting creator',
-        HttpStatus.FORBIDDEN,
-      );
+    if (meeting) {
+      if (meeting.creator_id !== creatorId) {
+        throw new HttpException(
+          'Permission denied: not the meeting creator',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+      return meeting;
     }
-    return meeting;
+    return null;
   }
 
-  async addUserToMeeting(
+  async addUsersToMeeting(
     user: CoreUser,
     meetingId: string,
-    userToInvite: string,
-  ): Promise<meeting_user> {
+    usersToInvite: string[],
+  ) {
     const meeting = await this.prisma.meetings.findUnique({
       where: { id: meetingId },
     });
     if (!meeting) {
       throw new HttpException('Meeting not found', HttpStatus.NOT_FOUND);
     }
-    const userMeetingExists = await this.prisma.meeting_user.findFirst({
-      where: { meeting_id: meetingId, user_id: userToInvite },
-    });
-    if (userMeetingExists) {
-      throw new HttpException('User already in meeting', HttpStatus.FORBIDDEN);
-    }
-    await this.prisma.meeting_user.create({
-      data: {
+
+    const meetingUsers = await this.prisma.meeting_user.createMany({
+      skipDuplicates: true,
+      data: usersToInvite.map((userUrn) => ({
         meeting_id: meetingId,
-        user_id: userToInvite,
-      },
+        user_id: userUrn,
+      })),
     });
 
-    await this.helper.sendMeetingNotification(user, userToInvite);
-
-    return { meeting_id: meetingId, user_id: userToInvite };
-  }
-
-  // ---- List Meetings ----
-  async listMeetings(user: CoreUser) {
-    const meetings = await this.prisma.meetings.findMany({
-      include: { users: true },
-    });
-    return Promise.all(
-      meetings.map((meeting) => this.formatMeeting(meeting, user)),
+    await Promise.all(
+      usersToInvite.map(
+        async (userUrn) =>
+          await this.helper.sendMeetingNotification(user, userUrn),
+      ),
     );
+
+    return { meeting_id: meetingId, users: usersToInvite };
   }
 
-  async listMeetingsByUser(user: CoreUser) {
+  async getNextUserMeetings(user: CoreUser) {
     const meetings = await this.prisma.meetings.findMany({
       orderBy: { start_at: 'asc' },
       include: { users: true },
-      where: { users: { some: { user_id: user.urn } } },
+      where: {
+        users: { some: { user_id: user.urn } },
+        start_at: { gt: new Date() },
+      },
     });
 
     return Promise.all(
@@ -229,7 +235,6 @@ export class MeetingService {
       this.helper.getFormattedUser(meeting.creator_id, user.accessToken),
     ]);
 
-    delete meeting.creator_id;
     return { ...meeting, creator, users };
   }
 

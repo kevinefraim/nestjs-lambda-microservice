@@ -1,20 +1,21 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import axios from 'axios';
+import axiosInstance from './axios-instance';
 import { CoreUser } from 'src/common/types/core';
 
 @Injectable()
 export class CoreService {
-  private readonly coreApiUrl = process.env.CORE_API_URL || '';
-
   // Get User by URN
-  async getUserByUrn(urn: string, accessToken: string): Promise<CoreUser> {
+  async getUserByUrn(
+    urn: string,
+    accessToken: string,
+  ): Promise<CoreUser | null> {
     try {
-      const response = await axios.get(`${this.coreApiUrl}/api/users/${urn}`, {
+      const response = await axiosInstance.get(`/api/users/${urn}`, {
         params: { access_token: accessToken },
       });
-
       return response.data;
     } catch (error) {
+      console.error('Error fetching user by URN:', error.message);
       return null;
     }
   }
@@ -27,8 +28,8 @@ export class CoreService {
     participantUrn: string,
   ): Promise<void> {
     try {
-      await axios.post(
-        `${this.coreApiUrl}/api/notifications`,
+      await axiosInstance.post(
+        `/api/notifications`,
         {
           type,
           date,
@@ -40,10 +41,11 @@ export class CoreService {
           params: { access_token: user.accessToken },
         },
       );
-      return;
     } catch (error) {
-      console.log(error);
-
+      console.error(
+        'Error sending notification:',
+        error.response?.data || error.message,
+      );
       throw new HttpException(
         'Failed to send notification',
         HttpStatus.BAD_REQUEST,
@@ -51,14 +53,14 @@ export class CoreService {
     }
   }
 
-  // Get Group by URN
+  // Get Group Members by URN
   async getGroupMembersByUrn(
     groupUrn: string,
     user: CoreUser,
   ): Promise<CoreUser[]> {
     try {
-      const response = await axios.get(
-        `${this.coreApiUrl}/api/groups/${groupUrn}/members`,
+      const response = await axiosInstance.get(
+        `/api/groups/${groupUrn}/members`,
         {
           params: { access_token: user.accessToken },
         },
@@ -69,6 +71,7 @@ export class CoreService {
       ) as CoreUser[];
     } catch (error) {
       const errorMessage = error.response?.data?.message || error.message;
+      console.error('Error fetching group members:', errorMessage);
       throw new HttpException(
         `Failed to retrieve group data: ${errorMessage}`,
         HttpStatus.BAD_REQUEST,

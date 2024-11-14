@@ -53,7 +53,7 @@ export class MeetingHelperService {
     return users.filter((user) => user !== null);
   }
 
-  async getFormattedUser(userId: string, accessToken: string) {
+async getFormattedUser(userId: string, accessToken: string) {
     const user = await this.coreService.getUserByUrn(userId, accessToken);
     return user
       ? {

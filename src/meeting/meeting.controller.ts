@@ -37,15 +37,6 @@ import {
 export class MeetingController {
   constructor(private readonly meetingService: MeetingService) {}
 
-  @Get()
-  @ApiOperation({ summary: 'List all meetings' })
-  @ApiToken()
-  @ApiResponse({ status: 200, description: 'Meetings listed successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized access' })
-  async listMeetings(@GetUser() user: CoreUser) {
-    return this.meetingService.listMeetings(user);
-  }
-
   @Get(MEETING_NEXT_ROUTE)
   @ApiOperation({ summary: 'List upcoming meetings for a user' })
   @ApiToken()
@@ -54,8 +45,8 @@ export class MeetingController {
     description: 'Upcoming meetings listed successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized access' })
-  async listMeetingsByUser(@GetUser() user: CoreUser) {
-    return this.meetingService.listMeetingsByUser(user);
+  async getNextUserMeetings(@GetUser() user: CoreUser) {
+    return this.meetingService.getNextUserMeetings(user);
   }
 
   @Get(MEETING_GET_ONE_ROUTE)
@@ -85,16 +76,16 @@ export class MeetingController {
   @ApiOperation({ summary: 'Invite a user to a meeting' })
   @ApiToken()
   @ApiParam({ name: 'id', type: String, description: 'Meeting ID' })
-  @ApiBody({ schema: { example: { userUrn: 'urn:user:sample-user-id' } } })
+  @ApiBody({ schema: { example: { users: ['urn:user:sample-user-id'] } } })
   @ApiResponse({ status: 200, description: 'User invited successfully' })
   @ApiResponse({ status: 403, description: 'User already in meeting' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   async inviteUser(
     @GetUser() user: CoreUser,
     @Param('id') id: string,
-    @Body('userUrn') userUrn: string,
+    @Body('users') users: string[],
   ) {
-    return this.meetingService.addUserToMeeting(user, id, userUrn);
+    return this.meetingService.addUsersToMeeting(user, id, users);
   }
 
   @Put(MEETING_TOGGLE_ROUTE)
